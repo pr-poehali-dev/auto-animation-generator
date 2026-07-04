@@ -38,35 +38,17 @@ function interp(kfs: SceneObject['keyframes'], time: number) {
   };
 }
 
-const initialObjects: SceneObject[] = [
-  {
-    id: 'obj-1', name: 'Планета', color: '#3B9EFF',
-    keyframes: [
-      { time: 0, x: 20, y: 55, rotation: 0, scale: 1, opacity: 1 },
-      { time: 50, x: 55, y: 30, rotation: 180, scale: 1.4, opacity: 1 },
-      { time: 100, x: 80, y: 55, rotation: 360, scale: 1, opacity: 1 },
-    ],
-  },
-  {
-    id: 'obj-2', name: 'Спутник', color: '#A855F7',
-    keyframes: [
-      { time: 0, x: 70, y: 20, rotation: 0, scale: 0.6, opacity: 0.4 },
-      { time: 60, x: 35, y: 70, rotation: 90, scale: 0.9, opacity: 1 },
-    ],
-  },
-];
-
 const Index = () => {
-  const [objects, setObjects] = useState<SceneObject[]>(initialObjects);
-  const [selectedId, setSelectedId] = useState<string>('obj-1');
-  const [time, setTime] = useState(28);
+  const [objects, setObjects] = useState<SceneObject[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiThinking, setAiThinking] = useState(false);
   const rafRef = useRef<number>();
 
-  const selected = objects.find((o) => o.id === selectedId)!;
-  const selectedState = useMemo(() => interp(selected.keyframes, time), [selected, time]);
+  const selected = objects.find((o) => o.id === selectedId) ?? null;
+  const selectedState = useMemo(() => (selected ? interp(selected.keyframes, time) : null), [selected, time]);
 
   const play = () => {
     if (playing) { cancelAnimationFrame(rafRef.current!); setPlaying(false); return; }
@@ -119,6 +101,9 @@ const Index = () => {
         <aside className="w-56 shrink-0 border-r border-ae-line bg-ae-panel flex flex-col">
           <PanelHeader icon="Layers" title="Слои" count={objects.length} />
           <div className="flex-1 overflow-y-auto ae-scroll p-1.5 space-y-1">
+            {objects.length === 0 && (
+              <p className="text-[11px] text-muted-foreground text-center px-2 py-6 leading-relaxed">Нет слоёв.<br />Добавьте изображение, чтобы начать.</p>
+            )}
             {objects.map((o) => (
               <button
                 key={o.id}
@@ -146,6 +131,15 @@ const Index = () => {
               <div className="absolute top-2 left-3 text-[11px] font-mono text-muted-foreground bg-ae-panel/70 px-2 py-0.5 rounded">
                 Композиция · 1920×1080 · {time.toFixed(0)}f
               </div>
+              {objects.length === 0 && (
+                <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                  <div className="text-center text-muted-foreground animate-fade-in">
+                    <Icon name="ImageOff" size={40} className="mx-auto mb-3 opacity-50" />
+                    <p className="text-[13px]">Пустая сцена</p>
+                    <p className="text-[11px] mt-1">Загрузите изображение или создайте объект слева</p>
+                  </div>
+                </div>
+              )}
               {objects.map((o) => {
                 const s = interp(o.keyframes, time);
                 if (!s) return null;
@@ -165,7 +159,7 @@ const Index = () => {
                       className="w-16 h-16 rounded-2xl grid place-items-center font-semibold text-white shadow-lg"
                       style={{ background: `radial-gradient(circle at 30% 30%, ${o.color}, ${o.color}99)`, boxShadow: isSel ? `0 0 0 2px ${o.color}, 0 0 24px ${o.color}66` : `0 8px 24px #0006` }}
                     >
-                      <Icon name={o.id === 'obj-1' ? 'Globe' : 'Orbit'} size={26} />
+                      <Icon name="Square" size={26} />
                     </div>
                     {isSel && (
                       <div className="absolute -inset-2 border border-dashed border-ae-blue rounded-2xl pointer-events-none animate-scale-in" />
@@ -218,8 +212,8 @@ const Index = () => {
                   <div className="relative flex-1 h-9">
                     {/* interpolation line */}
                     <div className="absolute top-1/2 left-0 right-0 h-px bg-ae-line" />
-                    {selected.keyframes.map((kf, i) => {
-                      const next = selected.keyframes[i + 1];
+                    {(selected?.keyframes ?? []).map((kf, i) => {
+                      const next = selected!.keyframes[i + 1];
                       return (
                         <div key={i}>
                           {next && (
@@ -249,22 +243,26 @@ const Index = () => {
         <aside className="w-72 shrink-0 border-l border-ae-line bg-ae-panel flex flex-col">
           <PanelHeader icon="SlidersHorizontal" title="Свойства объекта" />
           <div className="p-3 space-y-3 border-b border-ae-line">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-sm" style={{ background: selected.color }} />
-              <span className="font-medium">{selected.name}</span>
-            </div>
-            {selectedState && (
-              <div className="space-y-2.5">
-                <PropRow label="Позиция X" value={`${selectedState.x.toFixed(1)}%`} pct={selectedState.x} />
-                <PropRow label="Позиция Y" value={`${selectedState.y.toFixed(1)}%`} pct={selectedState.y} />
-                <PropRow label="Поворот" value={`${selectedState.rotation.toFixed(0)}°`} pct={(selectedState.rotation % 360) / 3.6} />
-                <PropRow label="Масштаб" value={`${(selectedState.scale * 100).toFixed(0)}%`} pct={selectedState.scale * 50} />
-                <PropRow label="Прозрачность" value={`${(selectedState.opacity * 100).toFixed(0)}%`} pct={selectedState.opacity * 100} />
-              </div>
+            {selected && selectedState ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-sm" style={{ background: selected.color }} />
+                  <span className="font-medium">{selected.name}</span>
+                </div>
+                <div className="space-y-2.5">
+                  <PropRow label="Позиция X" value={`${selectedState.x.toFixed(1)}%`} pct={selectedState.x} />
+                  <PropRow label="Позиция Y" value={`${selectedState.y.toFixed(1)}%`} pct={selectedState.y} />
+                  <PropRow label="Поворот" value={`${selectedState.rotation.toFixed(0)}°`} pct={(selectedState.rotation % 360) / 3.6} />
+                  <PropRow label="Масштаб" value={`${(selectedState.scale * 100).toFixed(0)}%`} pct={selectedState.scale * 50} />
+                  <PropRow label="Прозрачность" value={`${(selectedState.opacity * 100).toFixed(0)}%`} pct={selectedState.opacity * 100} />
+                </div>
+                <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-md bg-ae-panel-2 hover:bg-ae-line text-muted-foreground transition-colors">
+                  <Icon name="Diamond" size={13} /> Добавить ключевой кадр
+                </button>
+              </>
+            ) : (
+              <p className="text-[12px] text-muted-foreground text-center py-6">Выберите объект на сцене, чтобы редактировать свойства.</p>
             )}
-            <button className="w-full flex items-center justify-center gap-1.5 py-2 rounded-md bg-ae-panel-2 hover:bg-ae-line text-muted-foreground transition-colors">
-              <Icon name="Diamond" size={13} /> Добавить ключевой кадр
-            </button>
           </div>
 
           {/* AI generator */}
